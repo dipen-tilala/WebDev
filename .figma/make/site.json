@@ -1,0 +1,10 @@
+{
+  "description": "Enables users to create and share interactive prototypes for seamless design collaboration and user testing.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
