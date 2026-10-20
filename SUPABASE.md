@@ -11,4 +11,6 @@
 
 The service-role key bypasses Supabase Row Level Security. It is only read by server-side code; never add it to a `VITE_` variable or browser code. The schema enables Row Level Security without public policies and grants table access only to `service_role`.
 
+After deploying, open `/api/health`. It should return `status: "ok"` and `database: "connected"`. If either `urlConfigured` or `serviceKeyConfigured` is false, add the missing variable in Vercel Project Settings and redeploy. A `request failed (401)` points to an invalid key; `request failed (404)` usually means the schema has not been run in that Supabase project. Other failures can be inspected in Vercel's Function Logs; logs include only the failing table and HTTP status, never credentials or request contents.
+
 This prototype uses a single shared demo dashboard and does not include sign-in or per-patient authorization. Keep real patient data out of it until authentication, authorization, and applicable privacy requirements are implemented.

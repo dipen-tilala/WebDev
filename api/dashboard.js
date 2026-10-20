@@ -5,6 +5,7 @@ export default async function handler(request, response) {
     try {
       return response.status(200).json(await getDashboard());
     } catch (error) {
+      console.error("[api/dashboard GET]", { name: error.name, status: error.status, table: error.table });
       return response.status(error.message.startsWith("Missing Supabase") ? 503 : 500).json({ error: "Could not load dashboard" });
     }
   }
@@ -13,6 +14,7 @@ export default async function handler(request, response) {
     try {
       return response.status(200).json(await updateDashboard(request.body ?? {}));
     } catch (error) {
+      console.error("[api/dashboard PATCH]", { name: error.name, status: error.status, table: error.table });
       return response.status(error.message.startsWith("Missing Supabase") ? 503 : 500).json({ error: "Could not save dashboard" });
     }
   }

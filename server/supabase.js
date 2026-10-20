@@ -36,8 +36,7 @@ async function supabaseRequest(table, query, { method = "GET", body, prefer } = 
   });
 
   if (!response.ok) {
-    const detail = await response.text();
-    throw new Error(`Supabase request failed (${response.status}): ${detail}`);
+    throw Object.assign(new Error("Supabase REST request failed"), { status: response.status, table });
   }
   return response.status === 204 ? null : response.json();
 }

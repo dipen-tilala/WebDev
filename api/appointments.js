@@ -16,6 +16,7 @@ export default async function handler(request, response) {
     if (error.message === "Department, date, and time are required") {
       return response.status(400).json({ error: error.message });
     }
+    console.error("[api/appointments POST]", { name: error.name, status: error.status, table: error.table });
     return response.status(500).json({ error: "Could not create appointment" });
   }
 }
