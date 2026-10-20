@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type IconName =
   | "home"
@@ -50,29 +50,57 @@ const navItems: { label: string; icon: IconName }[] = [
   { label: "Doctors", icon: "doctors" },
 ];
 
+const initialDetails = {
+  patientName: "Aarav Sharma",
+  patientId: "CF-28419",
+  token: "A-27",
+  nowServing: "A-24",
+  patientsAhead: "3",
+  waitTime: "18",
+  department: "General Medicine",
+  doctorName: "Dr. Ananya Kapoor",
+  doctorInitials: "AK",
+  specialty: "General Medicine",
+  room: "204",
+  appointmentTime: "10:30 AM",
+  location: "West Wing, Floor 2",
+  appointmentId: "#AP-1072",
+};
+
+type Appointment = { id: string; department: string; date: string; time: string; status: string };
+type Dashboard = { details: typeof initialDetails; notifications: boolean; checkedIn: boolean; appointments: Appointment[] };
+
+function formatAppointmentDate(value: string) {
+  return new Date(`${value}T12:00:00`).toLocaleDateString("en", { weekday: "short", day: "2-digit", month: "short" }).toUpperCase();
+}
+
 export default function App() {
   const [active, setActive] = useState("Overview");
   const [bookingOpen, setBookingOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [notifications, setNotifications] = useState(true);
   const [checkedIn, setCheckedIn] = useState(false);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [bookingDepartment, setBookingDepartment] = useState("General Medicine");
+  const [bookingDate, setBookingDate] = useState("2026-10-25");
+  const [bookingTime, setBookingTime] = useState("10:30 AM");
   const [toast, setToast] = useState("");
-  const [details, setDetails] = useState({
-    patientName: "Aarav Sharma",
-    patientId: "CF-28419",
-    token: "A-27",
-    nowServing: "A-24",
-    patientsAhead: "3",
-    waitTime: "18",
-    department: "General Medicine",
-    doctorName: "Dr. Ananya Kapoor",
-    doctorInitials: "AK",
-    specialty: "General Medicine",
-    room: "204",
-    appointmentTime: "10:30 AM",
-    location: "West Wing, Floor 2",
-    appointmentId: "#AP-1072",
-  });
+  const [details, setDetails] = useState(initialDetails);
+
+  useEffect(() => {
+    fetch("/api/dashboard")
+      .then((response) => {
+        if (!response.ok) throw new Error("Dashboard request failed");
+        return response.json() as Promise<Dashboard>;
+      })
+      .then((dashboard) => {
+        setDetails(dashboard.details);
+        setNotifications(dashboard.notifications);
+        setCheckedIn(dashboard.checkedIn);
+        setAppointments(dashboard.appointments);
+      })
+      .catch(() => setToast("Could not connect to the local API"));
+  }, []);
 
   function updateDetail(key: keyof typeof details, value: string) {
     setDetails((current) => ({ ...current, [key]: value }));
@@ -81,6 +109,36 @@ export default function App() {
   function showToast(message: string) {
     setToast(message);
     window.setTimeout(() => setToast(""), 2600);
+  }
+
+  async function saveDashboard(updates: Partial<Pick<Dashboard, "details" | "notifications" | "checkedIn">>) {
+    const response = await fetch("/api/dashboard", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updates),
+    });
+    if (!response.ok) throw new Error("Dashboard update failed");
+    const dashboard = await response.json() as Dashboard;
+    setDetails(dashboard.details);
+    setNotifications(dashboard.notifications);
+    setCheckedIn(dashboard.checkedIn);
+  }
+
+  async function bookAppointment() {
+    try {
+      const response = await fetch("/api/appointments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ department: bookingDepartment, date: bookingDate, time: bookingTime }),
+      });
+      if (!response.ok) throw new Error("Appointment request failed");
+      const appointment = await response.json() as Appointment;
+      setAppointments((current) => [...current, appointment]);
+      setBookingOpen(false);
+      showToast("Appointment request confirmed");
+    } catch {
+      showToast("Could not book appointment. Please try again.");
+    }
   }
 
   return (
@@ -159,7 +217,13 @@ export default function App() {
             </div>
             <div className="queue-foot">
               <label className="notify-toggle">
-                <button className={notifications ? "on" : ""} onClick={() => setNotifications(!notifications)} aria-label="Toggle queue alerts"><span /></button>
+                <button className={notifications ? "on" : ""} onClick={async () => {
+                  try {
+                    await saveDashboard({ notifications: !notifications });
+                  } catch {
+                    showToast("Could not update queue alerts");
+                  }
+                }} aria-label="Toggle queue alerts"><span /></button>
                 <span><strong>Queue alerts are {notifications ? "on" : "off"}</strong><small>{notifications ? "We'll notify you when 1 patient is ahead" : "Turn on to receive live updates"}</small></span>
               </label>
               <button className="text-button" onClick={() => setActive("My queue")}>View queue details <Icon name="chevron" size={16} /></button>
@@ -178,7 +242,14 @@ export default function App() {
               <div><span>Location</span><strong>{details.location}</strong></div>
               <div><span>Appointment ID</span><strong>{details.appointmentId}</strong></div>
             </div>
-            <button className={`checkin-button ${checkedIn ? "complete" : ""}`} onClick={() => { setCheckedIn(true); showToast(`You're checked in. Token ${details.token} is active.`); }}>
+            <button className={`checkin-button ${checkedIn ? "complete" : ""}`} onClick={async () => {
+              try {
+                await saveDashboard({ checkedIn: true });
+                showToast(`You're checked in. Token ${details.token} is active.`);
+              } catch {
+                showToast("Could not check in. Please try again.");
+              }
+            }}>
               <Icon name={checkedIn ? "check" : "ticket"} size={18} /> {checkedIn ? "Checked in" : "Check in now"}
             </button>
           </article>
@@ -210,6 +281,20 @@ export default function App() {
               <span className="confirmed"><Icon name="check" size={14} /> Confirmed</span>
               <button className="more-button" aria-label="Appointment options">•••</button>
             </article>
+            {appointments.map((appointment) => {
+              const [year, month, day] = appointment.date.split("-");
+              return (
+                <article className="appointment-card" key={appointment.id}>
+                  <div className="date-tile pale"><strong>{day}</strong><span>{new Date(Number(year), Number(month) - 1).toLocaleDateString("en", { month: "short" }).toUpperCase()}</span></div>
+                  <div className="appointment-info">
+                    <span>{formatAppointmentDate(appointment.date)} · {appointment.time}</span>
+                    <h3>{appointment.department} consultation</h3>
+                    <p>Appointment ID · {appointment.id}</p>
+                  </div>
+                  <span className="confirmed"><Icon name="check" size={14} /> {appointment.status}</span>
+                </article>
+              );
+            })}
           </div>
 
           <div>
@@ -246,10 +331,10 @@ export default function App() {
             <p className="eyebrow">NEW APPOINTMENT</p>
             <h2>Book a consultation</h2>
             <p className="modal-intro">Choose a department and preferred time. We'll confirm the doctor instantly.</p>
-            <label>Department<select defaultValue="General Medicine"><option>General Medicine</option><option>Cardiology</option><option>Orthopedics</option></select></label>
-            <label>Preferred date<input type="date" defaultValue="2026-08-25" /></label>
-            <label>Preferred time<select defaultValue="10:30 AM"><option>10:30 AM</option><option>12:00 PM</option><option>3:15 PM</option></select></label>
-            <button className="modal-submit" onClick={() => { setBookingOpen(false); showToast("Appointment request confirmed"); }}>Confirm appointment</button>
+            <label>Department<select value={bookingDepartment} onChange={(event) => setBookingDepartment(event.target.value)}><option>General Medicine</option><option>Cardiology</option><option>Orthopedics</option></select></label>
+            <label>Preferred date<input type="date" value={bookingDate} onChange={(event) => setBookingDate(event.target.value)} /></label>
+            <label>Preferred time<select value={bookingTime} onChange={(event) => setBookingTime(event.target.value)}><option>10:30 AM</option><option>12:00 PM</option><option>3:15 PM</option></select></label>
+            <button className="modal-submit" onClick={bookAppointment}>Confirm appointment</button>
           </div>
         </div>
       )}
@@ -280,7 +365,15 @@ export default function App() {
               <label>Location<input value={details.location} onChange={(event) => updateDetail("location", event.target.value)} /></label>
               <label>Appointment ID<input value={details.appointmentId} onChange={(event) => updateDetail("appointmentId", event.target.value)} /></label>
             </div>
-            <button className="modal-submit" onClick={() => { setEditOpen(false); showToast("Prototype details updated"); }}>Save changes</button>
+            <button className="modal-submit" onClick={async () => {
+              try {
+                await saveDashboard({ details });
+                setEditOpen(false);
+                showToast("Prototype details updated");
+              } catch {
+                showToast("Could not save changes. Please try again.");
+              }
+            }}>Save changes</button>
           </div>
         </div>
       )}
