@@ -17,21 +17,23 @@ const initialDetails = {
 
 function getConfig() {
   const url = process.env.SUPABASE_URL?.replace(/\/$/, "");
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error("Missing Supabase configuration. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.");
+  const key = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) throw new Error("Missing Supabase configuration. Set SUPABASE_URL and SUPABASE_SECRET_KEY.");
   return { url, key };
 }
 
 async function supabaseRequest(table, query, { method = "GET", body, prefer } = {}) {
   const { url, key } = getConfig();
+  const headers = {
+    apikey: key,
+    "Content-Type": "application/json",
+    ...(prefer ? { Prefer: prefer } : {}),
+  };
+  if (key.startsWith("eyJ")) headers.Authorization = `Bearer ${key}`;
+
   const response = await fetch(`${url}/rest/v1/${table}${query}`, {
     method,
-    headers: {
-      apikey: key,
-      Authorization: `Bearer ${key}`,
-      "Content-Type": "application/json",
-      ...(prefer ? { Prefer: prefer } : {}),
-    },
+    headers,
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
 

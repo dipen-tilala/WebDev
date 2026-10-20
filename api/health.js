@@ -3,7 +3,7 @@ import { getDashboard } from "../server/supabase.js";
 export default async function handler(_request, response) {
   const config = {
     urlConfigured: Boolean(process.env.SUPABASE_URL),
-    serviceKeyConfigured: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
+    serviceKeyConfigured: Boolean(process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY),
   };
 
   try {
